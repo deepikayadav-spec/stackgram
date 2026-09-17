@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stackgram</title>
+<meta name="description" content="A student content feed for DSA, Full Stack, Aptitude, Maths, English, GenAI and Misc - upload clips or notes of any length, collect likes and followers.">
+<meta name="theme-color" content="#0E6E58">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%93%9A</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="bar">
+  <div class="bar-in">
+    <div class="brand"><i></i>Stackgram</div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      <input id="q" type="search" placeholder="Search topics, creators, tags…" autocomplete="off">
+    </div>
+    <div class="seg" role="group" aria-label="View">
+      <button id="v-feed" aria-pressed="true">Feed</button>
+      <button id="v-following" aria-pressed="false">Following</button>
+      <button id="v-you" aria-pressed="false">You</button>
+    </div>
+    <button class="btn primary" id="new-post">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"></path></svg>
+      Upload
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="banner"></div>
+  <div class="cols">
+    <main>
+      <div class="tracks" id="tracks"></div>
+      <div class="toolrow">
+        <div class="seg" role="group" aria-label="Length">
+          <button data-dur="all" aria-pressed="true">Any length</button>
+          <button data-dur="s" aria-pressed="false">&lt; 1 min</button>
+          <button data-dur="m" aria-pressed="false">1–5 min</button>
+          <button data-dur="l" aria-pressed="false">5–20 min</button>
+          <button data-dur="x" aria-pressed="false">20 min+</button>
+        </div>
+        <div class="seg" role="group" aria-label="Sort">
+          <button data-sort="new" aria-pressed="true">Newest</button>
+          <button data-sort="top" aria-pressed="false">Most liked</button>
+        </div>
+        <div class="count mono" id="count"></div>
+      </div>
+      <div id="main-out"></div>
+    </main>
+    <aside class="rail">
+      <div class="panel">
+        <h3>Your board</h3>
+        <div class="stats" id="mystats"></div>
+      </div>
+      <div class="panel">
+        <h3>Creators to follow</h3>
+        <div id="creators"></div>
+      </div>
+      <div class="panel">
+        <h3>Tracks by volume</h3>
+        <div id="volume"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<nav class="tabbar" aria-label="Sections">
+  <button id="t-feed" aria-pressed="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="9" rx="2"></rect><rect x="14" y="3" width="7" height="5" rx="2"></rect><rect x="3" y="16" width="7" height="5" rx="2"></rect><rect x="14" y="12" width="7" height="9" rx="2"></rect></svg>
+    Feed
+  </button>
+  <button id="t-following" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8" r="3.4"></circle><path d="M3 20c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"></path><path d="M18 8.5v5M20.5 11h-5"></path></svg>
+    Following
+  </button>
+  <button class="fab" id="t-upload" aria-label="Upload">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
+  <button id="t-you" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 20c0-3.5 3.1-5.6 7-5.6s7 2.1 7 5.6"></path></svg>
+    You
+  </button>
+</nav>
+
+<div id="layer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
