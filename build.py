@@ -6,6 +6,7 @@
 
 Run this after touching any shared file; the two builds must not drift.
 """
+import hashlib
 import pathlib
 import re
 
@@ -34,8 +35,17 @@ def strip_downloads(js: str) -> str:
     return DOWNLOAD_BLOCK.sub("", js)
 
 
+def stamp(name: str) -> str:
+    """Append a content hash so a browser can never serve a stale build."""
+    digest = hashlib.sha1((here / name).read_bytes()).hexdigest()[:8]
+    return f"{name}?v={digest}"
+
+
 def build_site() -> pathlib.Path:
     out = here / "index.html"
+    css = stamp("app.css")
+    store = stamp("store-local.js")
+    app = stamp("app.js")
     out.write_text(
         f"""<!doctype html>
 <html lang="en">
@@ -49,13 +59,13 @@ def build_site() -> pathlib.Path:
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="{css}">
 </head>
 <body>
 {BODY}
 
-<script src="store-local.js"></script>
-<script src="app.js"></script>
+<script src="{store}"></script>
+<script src="{app}"></script>
 </body>
 </html>
 """,

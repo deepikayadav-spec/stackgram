@@ -138,13 +138,14 @@
       box.appendChild(n);
     }
   }
-  function coverNode(p, big) {
+  function coverNode(p, mode) {
+    var big = mode === true;
     var box;
     if (big) {
       box = el("div", "post-media");
     } else {
       box = document.createElement("button");
-      box.className = "cover";
+      box.className = mode || "media";
       box.type = "button";
       box.setAttribute("aria-label", "Open " + (p.title || "post"));
     }
@@ -190,37 +191,101 @@
     return box;
   }
 
-  function cardNode(p) {
-    var card = el("article", "card");
-    if (p.archived) card.classList.add("archived");
-    var cov = coverNode(p, false);
-    cov.onclick = function () { openPost(p.id); };
-    card.appendChild(cov);
-    if (p.archived) card.appendChild(el("div", "flag", "Archived"));
-    if (p.authorId && p.authorId === Store.uid()) {
-      var menu = el("button", "owner-menu", "⋯");
-      menu.type = "button";
-      menu.title = "Edit, archive or delete";
-      menu.setAttribute("aria-label", "Options for " + (p.title || "your post"));
-      menu.onclick = function (e) { e.stopPropagation(); openOwnerMenu(p.id); };
-      card.appendChild(menu);
-    }
-    card.appendChild(el("div", "ttl", p.title || "Untitled"));
-
-    var meta = el("div", "meta");
-    meta.appendChild(avatarNode(p));
-    meta.appendChild(el("b", null, authorName(p)));
-    if (p.sample) meta.appendChild(el("span", "sample", "sample"));
-    var like = el("button", "ico");
-    like.style.marginLeft = "auto";
-    like.setAttribute("aria-pressed", Store.iLiked(p.id) ? "true" : "false");
-    like.appendChild(heart(Store.iLiked(p.id)));
-    like.appendChild(el("span", "mono", String(Store.likeCount(p.id))));
-    like.onclick = function (e) { e.stopPropagation(); Store.toggleLike(p.id); };
-    meta.appendChild(like);
-    card.appendChild(meta);
-    return card;
+  function ownerMenuButton(p, cls) {
+    var menu = el("button", cls, "⋯");
+    menu.type = "button";
+    menu.title = "Edit, archive or delete";
+    menu.setAttribute("aria-label", "Options for " + (p.title || "your post"));
+    menu.onclick = function (e) { e.stopPropagation(); openOwnerMenu(p.id); };
+    return menu;
   }
+
+  /* A feed post: author, media, like, caption — the whole post in one column,
+     the way a phone feed reads. */
+  function postNode(p) {
+    var post = el("article", "post");
+    if (p.archived) post.classList.add("archived");
+    var mine = p.authorId && p.authorId === Store.uid();
+
+    var head = el("div", "post-head");
+    head.appendChild(avatarNode(p, 32));
+    var who = el("div", "who");
+    var nm = el("div", "nm", authorName(p));
+    who.appendChild(nm);
+    who.appendChild(el("div", "sub", tname(p.track) + " · " + fmtDur(p.durationSec)));
+    head.appendChild(who);
+    if (p.sample) head.appendChild(el("span", "sample", "sample"));
+    if (mine) {
+      head.appendChild(ownerMenuButton(p, "owner-menu"));
+    } else if (p.authorId) {
+      var f = el("button", "btn small" + (Store.iFollow(p.authorId) ? "" : " primary"),
+        Store.iFollow(p.authorId) ? "Following" : "Follow");
+      f.onclick = function () { Store.toggleFollow(p.authorId); };
+      head.appendChild(f);
+    }
+    post.appendChild(head);
+
+    var media = coverNode(p, "media");
+    media.onclick = function () { openPost(p.id); };
+    if (p.archived) media.appendChild(el("div", "flag", "Archived"));
+    /* double-tap the media to like, the gesture people already know */
+    var burst = el("div", "burst");
+    burst.appendChild(heart(true));
+    media.appendChild(burst);
+    media.addEventListener("dblclick", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!Store.iLiked(p.id)) Store.toggleLike(p.id);
+      burst.classList.remove("on");
+      void burst.offsetWidth;
+      burst.classList.add("on");
+    });
+    post.appendChild(media);
+
+    var acts = el("div", "post-actions");
+    var like = el("button", "ico");
+    like.setAttribute("aria-pressed", Store.iLiked(p.id) ? "true" : "false");
+    like.setAttribute("aria-label", Store.iLiked(p.id) ? "Unlike" : "Like");
+    like.appendChild(heart(Store.iLiked(p.id)));
+    var n = Store.likeCount(p.id);
+    like.appendChild(el("span", "mono", n + (n === 1 ? " like" : " likes")));
+    like.onclick = function () { Store.toggleLike(p.id); };
+    acts.appendChild(like);
+    acts.appendChild(el("span", "when", ago(p.createdAt)));
+    post.appendChild(acts);
+
+    var cap = el("div", "caption");
+    var line = el("div", "line");
+    var b = el("b", null, authorName(p));
+    line.appendChild(b);
+    line.appendChild(document.createTextNode(" " + (p.title || "Untitled")));
+    cap.appendChild(line);
+    if (p.note) cap.appendChild(el("div", "note", p.note));
+    if (p.tags && p.tags.length) {
+      var tg = el("div", "tags");
+      p.tags.slice(0, 4).forEach(function (t) {
+        var tb = el("button", "tag", "#" + t);
+        tb.onclick = function () { view.q = t; $("q").value = t; render(); };
+        tg.appendChild(tb);
+      });
+      cap.appendChild(tg);
+    }
+    post.appendChild(cap);
+    return post;
+  }
+
+  /* A profile tile: square, media only — the You tab is a contact sheet. */
+  function tileNode(p) {
+    var wrap = el("div");
+    wrap.style.position = "relative";
+    var tile = coverNode(p, "tile");
+    if (p.archived) tile.classList.add("archived");
+    tile.onclick = function () { openPost(p.id); };
+    wrap.appendChild(tile);
+    if (p.authorId === Store.uid()) wrap.appendChild(ownerMenuButton(p, "tile-menu"));
+    return wrap;
+  }
+
 
   function myPosts(archived) {
     return Store.posts().filter(function (p) {
@@ -323,9 +388,15 @@
       out.appendChild(e);
       return;
     }
-    var g = el("div", "grid");
-    list.forEach(function (p) { g.appendChild(cardNode(p)); });
-    out.appendChild(g);
+    if (view.tab === "you") {
+      var tiles = el("div", "tiles");
+      list.forEach(function (p) { tiles.appendChild(tileNode(p)); });
+      out.appendChild(tiles);
+    } else {
+      var feed = el("div", "feed");
+      list.forEach(function (p) { feed.appendChild(postNode(p)); });
+      out.appendChild(feed);
+    }
   }
 
   function render() {
