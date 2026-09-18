@@ -607,6 +607,7 @@
     var side = el("div", "post-side");
     var head = el("div");
     head.style.cssText = "display:flex;align-items:center;gap:9px";
+    head.appendChild(backArrow());
     head.appendChild(avatarNode(p, 32));
     var meta = el("div");
     meta.style.cssText = "flex:1;min-width:0";
@@ -623,9 +624,6 @@
       fb.onclick = function () { Store.toggleFollow(p.authorId); openPost(pid); };
       head.appendChild(fb);
     }
-    var x = el("button", "btn small", "Close");
-    x.onclick = closeLayer;
-    head.appendChild(x);
     side.appendChild(head);
 
     var line = el("div", "hint", tname(p.track) + " · " + fmtDur(p.durationSec));
