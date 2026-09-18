@@ -21,7 +21,7 @@
   function tcolor(id) { return "var(" + (TMAP[id] || TMAP.misc).v + ")"; }
   function tname(id) { return (TMAP[id] || TMAP.misc).name; }
 
-  var view = { tab: "feed", track: "all", q: "", dur: "all", sort: "new" };
+  var view = { tab: "feed", track: "all", q: "", dur: "all", sort: "new", archived: false };
 
   /* ---------------- helpers ---------------- */
   var $ = function (id) { return document.getElementById(id); };
@@ -86,6 +86,11 @@
       if (view.dur !== "all" && durBucket(p.durationSec || 0) !== view.dur) return false;
       if (view.tab === "following" && !Store.iFollow(p.authorId)) return false;
       if (view.tab === "you" && p.authorId !== Store.uid()) return false;
+      /* an archived post is visible only to its creator, on the You tab with
+         the archive open */
+      var mine = p.authorId === Store.uid();
+      if (p.archived && !(mine && view.tab === "you" && view.archived)) return false;
+      if (!p.archived && mine && view.tab === "you" && view.archived) return false;
       if (q) {
         var hay = [p.title, p.note, authorName(p), tname(p.track)]
           .concat(p.tags || []).join(" ").toLowerCase();
@@ -187,9 +192,19 @@
 
   function cardNode(p) {
     var card = el("article", "card");
+    if (p.archived) card.classList.add("archived");
     var cov = coverNode(p, false);
     cov.onclick = function () { openPost(p.id); };
     card.appendChild(cov);
+    if (p.archived) card.appendChild(el("div", "flag", "Archived"));
+    if (p.authorId && p.authorId === Store.uid()) {
+      var menu = el("button", "owner-menu", "⋯");
+      menu.type = "button";
+      menu.title = "Edit, archive or delete";
+      menu.setAttribute("aria-label", "Options for " + (p.title || "your post"));
+      menu.onclick = function (e) { e.stopPropagation(); openOwnerMenu(p.id); };
+      card.appendChild(menu);
+    }
     card.appendChild(el("div", "ttl", p.title || "Untitled"));
 
     var meta = el("div", "meta");
@@ -205,6 +220,12 @@
     meta.appendChild(like);
     card.appendChild(meta);
     return card;
+  }
+
+  function myPosts(archived) {
+    return Store.posts().filter(function (p) {
+      return p.authorId === Store.uid() && !!p.archived === !!archived;
+    });
   }
 
   function creatorRows() {
@@ -254,7 +275,7 @@
     box.textContent = "";
     box.hidden = view.tab !== "you";
     if (view.tab !== "you") return;
-    var mine = Store.posts().filter(function (p) { return p.authorId === Store.uid(); });
+    var mine = myPosts(false);
     var likes = mine.reduce(function (n, p) { return n + Store.likeCount(p.id); }, 0);
     [[mine.length, "Posts"], [Store.followerCount(Store.uid()), "Followers"], [likes, "Likes"]]
       .forEach(function (d) {
@@ -263,11 +284,19 @@
         s.appendChild(el("span", null, d[1]));
         box.appendChild(s);
       });
+    var right = el("div");
+    right.style.cssText = "margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+    var archived = myPosts(true).length;
+    var t = el("button", "btn small" + (view.archived ? " primary" : ""),
+      view.archived ? "Showing archive (" + archived + ")" : "Archive (" + archived + ")");
+    t.onclick = function () { view.archived = !view.archived; render(); };
+    right.appendChild(t);
     if (Store.canSetName()) {
       var b = el("button", "btn small", Store.name() ? "Posting as " + Store.name() : "Set your name");
       b.onclick = openName;
-      box.appendChild(b);
+      right.appendChild(b);
     }
+    box.appendChild(right);
   }
 
   function renderFeed() {
@@ -277,7 +306,10 @@
     $("count").textContent = list.length + (list.length === 1 ? " post" : " posts");
     if (!list.length) {
       var e = el("div", "empty");
-      if (view.tab === "you") {
+      if (view.tab === "you" && view.archived) {
+        e.appendChild(el("h3", null, "Nothing archived"));
+        e.appendChild(el("p", null, "Archiving a post hides it from the feed but keeps it here."));
+      } else if (view.tab === "you") {
         e.appendChild(el("h3", null, "Nothing uploaded yet"));
         e.appendChild(el("p", null, "Post a walkthrough, a cheat sheet or a 30-second trick."));
       } else if (view.tab === "following") {
@@ -357,6 +389,77 @@
     inp.focus();
   }
 
+  /* ---------------- creator controls ---------------- */
+  function openOwnerMenu(pid) {
+    var p = Store.posts().filter(function (x) { return x.id === pid; })[0];
+    if (!p) return;
+    var sheet = el("div", "sheet");
+    sheet.appendChild(sheetHead(p.title || "Your post"));
+    var b = el("div", "sheet-b");
+    var list = el("div", "menu-list");
+
+    var open = el("button", null, "Open");
+    open.onclick = function () { closeLayer(); openPost(pid); };
+    list.appendChild(open);
+
+    var edit = el("button", null, "Edit details");
+    edit.onclick = function () { closeLayer(); openComposer(p); };
+    list.appendChild(edit);
+
+    var arch = el("button", null, p.archived
+      ? "Unarchive — put it back in the feed"
+      : "Archive — hide it from the feed, keep it in You");
+    arch.onclick = function () { setArchived(p, !p.archived); };
+    list.appendChild(arch);
+
+    var del = el("button", "danger", "Delete permanently");
+    del.onclick = function () { confirmDelete(p); };
+    list.appendChild(del);
+
+    b.appendChild(list);
+    sheet.appendChild(b);
+    openLayer(sheet);
+  }
+
+  function setArchived(p, on) {
+    Store.updatePost(p.id, { archived: !!on }).then(function () {
+      closeLayer();
+      toast(on ? "Archived — only you can see it now" : "Back in the feed");
+    }, function (e) {
+      toast((e && e.message) || "Couldn't update that post");
+    });
+  }
+
+  function confirmDelete(p) {
+    var sheet = el("div", "sheet");
+    sheet.appendChild(sheetHead("Delete this post?"));
+    var b = el("div", "sheet-b");
+    b.appendChild(el("div", "ttl", p.title || "Untitled"));
+    b.appendChild(el("p", "hint",
+      "Deleting removes the post and its likes for everyone, and can't be undone. "
+      + "To take it out of the feed but keep it, archive it instead."));
+    var row = el("div");
+    row.style.cssText = "display:flex;gap:10px";
+    var go = el("button", "btn primary", "Delete");
+    go.style.background = "var(--hot)";
+    go.onclick = function () {
+      go.disabled = true;
+      go.textContent = "Deleting…";
+      Store.deletePost(p.id).then(function () { closeLayer(); toast("Post deleted"); },
+        function () { go.disabled = false; go.textContent = "Delete"; toast("Couldn't delete"); });
+    };
+    var keep = el("button", "btn", "Archive instead");
+    keep.onclick = function () { setArchived(p, true); };
+    var cancel = el("button", "btn", "Cancel");
+    cancel.onclick = closeLayer;
+    row.appendChild(go);
+    row.appendChild(keep);
+    row.appendChild(cancel);
+    b.appendChild(row);
+    sheet.appendChild(b);
+    openLayer(sheet);
+  }
+
   function openPost(pid) {
     var p = Store.posts().filter(function (x) { return x.id === pid; })[0];
     if (!p) return;
@@ -425,16 +528,18 @@
     like.onclick = function () { Store.toggleLike(p.id); closeLayer(); openPost(pid); };
     acts.appendChild(like);
     if (p.authorId === Store.uid()) {
+      var own = el("div");
+      own.style.cssText = "margin-left:auto;display:flex;gap:8px";
+      var edit = el("button", "btn small", "Edit");
+      edit.onclick = function () { closeLayer(); openComposer(p); };
+      own.appendChild(edit);
+      var arch = el("button", "btn small", p.archived ? "Unarchive" : "Archive");
+      arch.onclick = function () { setArchived(p, !p.archived); };
+      own.appendChild(arch);
       var del = el("button", "btn small", "Delete");
-      del.style.marginLeft = "auto";
-      del.onclick = function () {
-        del.textContent = "Tap again to delete";
-        del.onclick = function () {
-          Store.deletePost(p.id).then(function () { closeLayer(); toast("Post deleted"); },
-            function () { toast("Couldn't delete"); });
-        };
-      };
-      acts.appendChild(del);
+      del.onclick = function () { confirmDelete(p); };
+      own.appendChild(del);
+      acts.appendChild(own);
     }
     side.appendChild(acts);
     wrap.appendChild(side);
@@ -442,10 +547,12 @@
     openLayer(sheet);
   }
 
-  function openUpload() {
-    if (!Store.canPost()) { toast(Store.postBlockedReason()); return; }
+  /* One sheet for both jobs: `existing` means edit that post, otherwise post
+     a new one. */
+  function openComposer(existing) {
+    if (!existing && !Store.canPost()) { toast(Store.postBlockedReason()); return; }
     var sheet = el("div", "sheet");
-    sheet.appendChild(sheetHead("New upload"));
+    sheet.appendChild(sheetHead(existing ? "Edit post" : "New upload"));
     var b = el("div", "sheet-b");
     var errBox = el("div", "err");
     errBox.hidden = true;
@@ -461,9 +568,17 @@
       fi.id = "up-file";
       fi.accept = "image/*,video/*";
       fi.style.display = "none";
-      var pick = el("button", "btn", "Choose image, GIF or video");
+      var hasMedia = existing && existing.kind !== "note";
+      var pick = el("button", "btn", hasMedia ? "Replace file" : "Choose image, GIF or video");
       pick.onclick = function () { fi.click(); };
       var prev = el("div");
+      if (hasMedia) {
+        var cur = document.createElement("img");
+        cur.src = Store.mediaSrc(existing);
+        cur.alt = "Current file";
+        cur.style.cssText = "max-height:120px;border-radius:9px";
+        prev.appendChild(cur);
+      }
       row.appendChild(pick);
       row.appendChild(fi);
       row.appendChild(el("p", "hint", "Any length. " + Store.attachHint()));
@@ -502,7 +617,7 @@
         pick.textContent = "Replace file";
       };
       b.appendChild(row);
-    } else {
+    } else if (!existing) {
       b.appendChild(el("p", "hint", Store.attachHint()));
     }
 
@@ -512,6 +627,7 @@
     ti.id = "up-title";
     ti.maxLength = 90;
     ti.placeholder = "Sliding window in 3 steps";
+    if (existing) ti.value = existing.title || "";
     lt.appendChild(ti);
     b.appendChild(lt);
 
@@ -526,6 +642,7 @@
       o.textContent = t.name;
       sel.appendChild(o);
     });
+    if (existing) sel.value = existing.track || "misc";
     ltr.appendChild(sel);
     two.appendChild(ltr);
     var ld = el("label", "f");
@@ -534,6 +651,7 @@
     di.id = "up-dur";
     di.placeholder = "4:30";
     di.inputMode = "numeric";
+    if (existing) di.value = fmtDur(existing.durationSec);
     ld.appendChild(di);
     two.appendChild(ld);
     b.appendChild(two);
@@ -543,6 +661,7 @@
     var na = document.createElement("textarea");
     na.id = "up-note";
     na.placeholder = "What does this cover, and who is it for?";
+    if (existing) na.value = existing.note || "";
     ln.appendChild(na);
     b.appendChild(ln);
 
@@ -551,47 +670,68 @@
     var tg = document.createElement("input");
     tg.id = "up-tags";
     tg.placeholder = "arrays, two-pointer, placement";
+    if (existing && existing.tags) tg.value = existing.tags.join(", ");
     lg.appendChild(tg);
     b.appendChild(lg);
 
-    var post = el("button", "btn primary", "Post");
+    var actions = el("div");
+    actions.style.cssText = "display:flex;gap:10px;align-items:center;flex-wrap:wrap";
+    var post = el("button", "btn primary", existing ? "Save changes" : "Post");
+    actions.appendChild(post);
+    if (existing) {
+      var arch = el("button", "btn", existing.archived ? "Unarchive" : "Archive");
+      arch.onclick = function () { setArchived(existing, !existing.archived); };
+      actions.appendChild(arch);
+      var del = el("button", "btn", "Delete");
+      del.onclick = function () { confirmDelete(existing); };
+      actions.appendChild(del);
+    }
+
     post.onclick = function () {
       var title = ti.value.trim();
       if (!title) { fail("Give the post a title so people can find it in search."); ti.focus(); return; }
       var dur = parseDur(di.value);
-      if (!dur && !picked.file) { fail("Add a length (like 4:30) so the filters work."); di.focus(); return; }
+      if (!dur && !picked.file && !existing) {
+        fail("Add a length (like 4:30) so the filters work.");
+        di.focus();
+        return;
+      }
       errBox.hidden = true;
       post.disabled = true;
-      post.textContent = "Posting…";
-      Store.addPost({
+      post.textContent = existing ? "Saving…" : "Posting…";
+      var fields = {
         title: title,
         note: na.value.trim(),
         track: sel.value,
         durationSec: dur,
-        kind: picked.file ? picked.kind : "note",
         tags: tg.value.split(",").map(function (t) { return t.trim().toLowerCase(); })
           .filter(Boolean).slice(0, 6)
-      }, picked.file).then(function () {
+      };
+      var done = existing
+        ? Store.updatePost(existing.id, fields, picked.file, picked.kind)
+        : Store.addPost(Object.assign({ kind: picked.file ? picked.kind : "note" }, fields), picked.file);
+      done.then(function () {
         closeLayer();
-        toast("Posted to " + tname(sel.value));
+        toast(existing ? "Changes saved" : "Posted to " + tname(sel.value));
       }, function (e) {
         post.disabled = false;
-        post.textContent = "Post";
-        fail((e && e.message) || "Couldn't post that. Try a smaller file.");
+        post.textContent = existing ? "Save changes" : "Post";
+        fail((e && e.message) || "Couldn't save that. Try a smaller file.");
       });
     };
-    b.appendChild(post);
+    b.appendChild(actions);
     sheet.appendChild(b);
     openLayer(sheet);
     ti.focus();
   }
 
+
   /* ---------------- events ---------------- */
-  $("new-post").onclick = openUpload;
-  $("t-upload").onclick = openUpload;
+  $("new-post").onclick = function () { openComposer(null); };
+  $("t-upload").onclick = function () { openComposer(null); };
   $("q").addEventListener("input", function (e) { view.q = e.target.value; renderFeed(); });
   ["feed", "following", "you"].forEach(function (v) {
-    var go = function () { view.tab = v; render(); $("scroller").scrollTo({ top: 0, behavior: "smooth" }); };
+    var go = function () { view.tab = v; if (v !== "you") view.archived = false; render(); $("scroller").scrollTo({ top: 0, behavior: "smooth" }); };
     $("v-" + v).onclick = go;
     $("t-" + v).onclick = go;
   });

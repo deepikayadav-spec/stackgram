@@ -182,6 +182,32 @@ window.StackgramStore = (function () {
       });
     },
 
+    /* Only your own posts are editable; the seeded ones are read-only. */
+    updatePost: function (id, patch, file, kind) {
+      var post = state.posts.filter(function (p) { return p.id === id; })[0];
+      if (!post) return Promise.reject(new Error("You can only edit your own posts."));
+      var step = file
+        ? new Promise(function (resolve, reject) {
+            var fr = new FileReader();
+            fr.onload = function () { resolve(fr.result); };
+            fr.onerror = function () { reject(new Error("Couldn't read that file.")); };
+            fr.readAsDataURL(file);
+          })
+        : Promise.resolve(null);
+      return step.then(function (dataUrl) {
+        var before = JSON.stringify(post);
+        Object.keys(patch).forEach(function (k) { post[k] = patch[k]; });
+        if (dataUrl) { post.src = dataUrl; post.kind = kind || post.kind; }
+        if (!write()) {
+          var restored = JSON.parse(before);
+          Object.keys(restored).forEach(function (k) { post[k] = restored[k]; });
+          onChange();
+          throw new Error("This browser wouldn't store that — try a smaller file.");
+        }
+        onChange();
+      });
+    },
+
     deletePost: function (id) {
       state.posts = state.posts.filter(function (p) { return p.id !== id; });
       changed();

@@ -184,6 +184,24 @@ window.StackgramStore = (function () {
       });
     },
 
+    updatePost: function (id, patch, file, kind) {
+      if (!db) return Promise.reject(new Error("Not connected to the shared feed"));
+      var post = posts.filter(function (p) { return p.id === id; })[0];
+      if (!post || post.authorId !== uid) {
+        return Promise.reject(new Error("You can only edit your own posts."));
+      }
+      var step = (file && assets)
+        ? assets.upload(file).then(function (r) { return r && r.id; })
+        : Promise.resolve(null);
+      return step.then(function (assetId) {
+        var body = Object.assign({}, patch);
+        if (assetId) { body.assetId = assetId; body.kind = kind || post.kind; }
+        return db.collection("posts").doc(id).update(body);
+      }).then(function () {}, function (e) {
+        throw new Error((e && e.message) || "Couldn't save those changes.");
+      });
+    },
+
     deletePost: function (id) {
       if (!db) return Promise.reject(new Error("not connected"));
       return db.collection("posts").doc(id).delete();
