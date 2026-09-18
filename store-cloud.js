@@ -9,7 +9,7 @@ window.StackgramStore = (function () {
 
   var db = null, assets = null, user = null;
   var uid = null, myName = "", canWrite = null, ready = false;
-  var posts = [], likes = [], follows = [], comments = [], names = {};
+  var posts = [], likes = [], follows = [], comments = [], views = [], names = {};
   var onChange = function () {};
   var mediaCache = {};
   var pendingNames = false;
@@ -63,6 +63,11 @@ window.StackgramStore = (function () {
 
     db.collection("follows").onSnapshot(function (snap) {
       follows = snap.docs.map(function (d) { return d.data() || {}; });
+      onChange();
+    }, function () {});
+
+    db.collection("views").onSnapshot(function (snap) {
+      views = snap.docs.map(function (d) { return d.data() || {}; });
       onChange();
     }, function () {});
 
@@ -160,6 +165,20 @@ window.StackgramStore = (function () {
       var ref = db.collection("follows").doc(safeId(uid) + "__" + safeId(id));
       if (this.iFollow(id)) ref.delete().catch(function () {});
       else ref.set({ followerId: uid, targetId: id, at: new Date().toISOString() }).catch(function () {});
+    },
+
+    /* one row per viewer, so the count is people rather than page loads */
+    viewCount: function (postId) {
+      var n = 0, i;
+      for (i = 0; i < views.length; i++) if (views[i].postId === postId) n++;
+      return n;
+    },
+    addView: function (postId) {
+      if (!db || !uid || canWrite === false) return;
+      if (views.some(function (v) { return v.postId === postId && v.userId === uid; })) return;
+      db.collection("views").doc(safeId(postId) + "__" + safeId(uid))
+        .set({ postId: postId, userId: uid, at: new Date().toISOString() })
+        .catch(function () {});
     },
 
     comments: function (postId) {

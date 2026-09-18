@@ -21,17 +21,17 @@ window.StackgramStore = (function () {
     { id: "s03", authorId: "demo-meera", authorName: "Meera K.", sample: true,
       title: "Auth in a React + Node app, end to end",
       note: "Full build: signup, JWT in an httpOnly cookie, refresh flow, protected routes. I make the classic mistakes on purpose and then fix them.",
-      track: "full", durationSec: 2740, kind: "note",
+      track: "full", durationSec: 2740, kind: "clip", src: "media/prev_auth.gif",
       createdAt: "2026-09-11T06:40:00.000Z", tags: ["react", "node", "jwt", "auth"] },
     { id: "s04", authorId: "demo-rohit", authorName: "Rohit B.", sample: true,
       title: "Why eigenvectors are just directions that survive",
       note: "Geometric intuition before the determinant grind. Three examples, no proofs.",
-      track: "math", durationSec: 903, kind: "note",
+      track: "math", durationSec: 903, kind: "clip", src: "media/prev_eigen.gif",
       createdAt: "2026-09-13T17:30:00.000Z", tags: ["linear-algebra", "eigenvalues"] },
     { id: "s05", authorId: "demo-sana", authorName: "Sana P.", sample: true,
       title: "Group discussion: 6 openers that don't sound rehearsed",
       note: "Recorded from a mock GD. Includes the two openers that got me cut off, so you can hear the difference.",
-      track: "eng", durationSec: 648, kind: "note",
+      track: "eng", durationSec: 648, kind: "clip", src: "media/prev_gd.gif",
       createdAt: "2026-09-14T11:15:00.000Z", tags: ["gd", "speaking", "interview"] },
     { id: "s06", authorId: "demo-karthik", authorName: "Karthik N.", sample: true,
       title: "RAG over your class notes, whole pipeline in 12 seconds",
@@ -42,32 +42,32 @@ window.StackgramStore = (function () {
     { id: "s07", authorId: "demo-ananya", authorName: "Ananya R.", sample: true,
       title: "Dijkstra on a 6-node graph, hand-traced",
       note: "The priority queue table filled in row by row. Pause at each step and predict the next pop.",
-      track: "dsa", durationSec: 1120, kind: "note",
+      track: "dsa", durationSec: 1120, kind: "clip", src: "media/prev_dijkstra.gif",
       createdAt: "2026-09-09T13:00:00.000Z", tags: ["graphs", "shortest-path"] },
     { id: "s08", authorId: "demo-vikram", authorName: "Vikram S.", sample: true,
       title: "Trains and boats problems in one formula sheet",
       note: "Relative speed reduces both topics to the same three lines. Screenshot it before your test.",
-      track: "apt", durationSec: 186, kind: "note",
+      track: "apt", durationSec: 186, kind: "clip", src: "media/prev_trains.gif",
       createdAt: "2026-09-12T08:10:00.000Z", tags: ["speed-distance", "formula-sheet"] },
     { id: "s09", authorId: "demo-meera", authorName: "Meera K.", sample: true,
       title: "CSS grid in 90 seconds, no framework",
       note: "Two properties do 80% of the work. Live coded a dashboard layout.",
-      track: "full", durationSec: 94, kind: "note",
+      track: "full", durationSec: 94, kind: "clip", src: "media/prev_cssgrid.gif",
       createdAt: "2026-09-17T05:25:00.000Z", tags: ["css", "grid", "layout"] },
     { id: "s10", authorId: "demo-priya", authorName: "Priya D.", sample: true,
       title: "How I track 300 practice problems without burning out",
       note: "My spreadsheet, the revision interval I use, and what I stopped doing after month two.",
-      track: "misc", durationSec: 735, kind: "note",
+      track: "misc", durationSec: 735, kind: "clip", src: "media/prev_tracker.gif",
       createdAt: "2026-09-10T15:45:00.000Z", tags: ["study-plan", "habits"] },
     { id: "s11", authorId: "demo-karthik", authorName: "Karthik N.", sample: true,
       title: "Prompt patterns that stop an agent from looping",
       note: "Four failure traces from my own agent, and the instruction change that fixed each one.",
-      track: "gen", durationSec: 1340, kind: "note",
+      track: "gen", durationSec: 1340, kind: "clip", src: "media/prev_agent.gif",
       createdAt: "2026-09-08T10:30:00.000Z", tags: ["agents", "prompting", "debugging"] },
     { id: "s12", authorId: "demo-rohit", authorName: "Rohit B.", sample: true,
       title: "Probability: the 3 questions that decide the marks",
       note: "Conditional, Bayes, expectation. One worked problem each, timed.",
-      track: "math", durationSec: 1562, kind: "note",
+      track: "math", durationSec: 1562, kind: "clip", src: "media/prev_probability.gif",
       createdAt: "2026-09-07T18:20:00.000Z", tags: ["probability", "bayes"] }
   ];
 
@@ -93,10 +93,13 @@ window.StackgramStore = (function () {
     ]
   };
 
+  var SEED_VIEWS = { s01: 412, s02: 288, s03: 1530, s04: 640, s05: 502, s06: 1184,
+                     s07: 733, s08: 214, s09: 96, s10: 388, s11: 910, s12: 655 };
+
   var KEY = "stackgram.v1";
   var MAX_BYTES = 3 * 1024 * 1024; /* uploads become data URLs in localStorage */
 
-  var state = { me: null, name: "", posts: [], likes: [], follows: [], comments: {} };
+  var state = { me: null, name: "", posts: [], likes: [], follows: [], comments: {}, views: [] };
   var storageOk = true;
   var onChange = function () {};
 
@@ -112,7 +115,8 @@ window.StackgramStore = (function () {
         posts: Array.isArray(d.posts) ? d.posts : [],
         likes: Array.isArray(d.likes) ? d.likes : [],
         follows: Array.isArray(d.follows) ? d.follows : [],
-        comments: (d.comments && typeof d.comments === "object") ? d.comments : {}
+        comments: (d.comments && typeof d.comments === "object") ? d.comments : {},
+        views: Array.isArray(d.views) ? d.views : []
       };
     } catch (e) { /* private window or blocked storage: run in memory */ }
   }
@@ -166,6 +170,15 @@ window.StackgramStore = (function () {
       if (id === state.me) return;
       var i = state.follows.indexOf(id);
       if (i === -1) state.follows.push(id); else state.follows.splice(i, 1);
+      changed();
+    },
+
+    viewCount: function (postId) {
+      return (SEED_VIEWS[postId] || 0) + (state.views.indexOf(postId) === -1 ? 0 : 1);
+    },
+    addView: function (postId) {
+      if (state.views.indexOf(postId) !== -1) return;
+      state.views.push(postId);
       changed();
     },
 

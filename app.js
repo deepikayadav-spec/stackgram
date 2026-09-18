@@ -92,6 +92,7 @@
       if (view.tab === "following" && !Store.iFollow(p.authorId)) return false;
       /* the search tab searches everything, so it filters like the feed */
       if (view.tab === "you" && p.authorId !== Store.uid()) return false;
+      if (view.tab === "shorts" && !isShort(p)) return false;
       /* an archived post is visible only to its creator, on the You tab with
          the archive open */
       var mine = p.authorId === Store.uid();
@@ -219,87 +220,110 @@
     return menu;
   }
 
-  /* A feed post: author, media, like, caption — the whole post in one column,
-     the way a phone feed reads. */
-  function postNode(p) {
-    var post = el("article", "post");
-    if (p.archived) post.classList.add("archived");
-    var mine = p.authorId && p.authorId === Store.uid();
+  /* Under a minute is a Short; anything longer is a video. One rule, and it
+     decides the shape everywhere. */
+  function isShort(p) { return (p.durationSec || 0) < 60; }
 
-    var head = el("div", "post-head");
-    head.appendChild(avatarNode(p, 32));
-    var who = el("div", "who");
-    var nm = el("div", "nm", authorName(p));
-    who.appendChild(nm);
-    who.appendChild(el("div", "sub", tname(p.track) + " · " + fmtDur(p.durationSec)));
-    head.appendChild(who);
-    if (p.sample) head.appendChild(el("span", "sample", "sample"));
-    if (mine) {
-      head.appendChild(ownerMenuButton(p, "owner-menu"));
-    } else if (p.authorId) {
-      var f = el("button", "btn small" + (Store.iFollow(p.authorId) ? "" : " primary"),
-        Store.iFollow(p.authorId) ? "Following" : "Follow");
-      f.onclick = function () { Store.toggleFollow(p.authorId); };
-      head.appendChild(f);
+  function viewLine(p) {
+    var v = Store.viewCount(p.id);
+    return v + (v === 1 ? " view · " : " views · ") + ago(p.createdAt);
+  }
+
+  /* A Short on the home shelf: portrait thumbnail, title, views. */
+  function shelfItem(p) {
+    var item = el("div", "shelf-item");
+    var m = coverNode(p, "media");
+    m.onclick = function () { openShorts(p.id); };
+    if (p.archived) m.appendChild(el("div", "flag", "Archived"));
+    item.appendChild(m);
+    item.appendChild(el("div", "t", p.title || "Untitled"));
+    item.appendChild(el("div", "s", Store.viewCount(p.id) + " views"));
+    return item;
+  }
+
+  /* A long video on home: 16:9 thumbnail beside title, channel and views. */
+  function videoRow(p) {
+    var row = el("div", "vrow");
+    if (p.archived) row.classList.add("archived");
+    var m = coverNode(p, "media");
+    m.onclick = function () { openPost(p.id); };
+    if (p.archived) m.appendChild(el("div", "flag", "Archived"));
+    row.appendChild(m);
+
+    var info = el("div", "info");
+    info.appendChild(avatarNode(p, 32));
+    var txt = el("div", "txt");
+    var t = el("div", "t", p.title || "Untitled");
+    t.style.cursor = "pointer";
+    t.onclick = function () { openPost(p.id); };
+    txt.appendChild(t);
+    txt.appendChild(el("div", "s", authorName(p) + (p.sample ? " · sample" : "")));
+    txt.appendChild(el("div", "s", viewLine(p) + " · " + tname(p.track)));
+    if (p.note) txt.appendChild(el("div", "note", p.note));
+    info.appendChild(txt);
+    if (p.authorId && p.authorId === Store.uid()) {
+      info.appendChild(ownerMenuButton(p, "owner-menu"));
     }
-    post.appendChild(head);
+    row.appendChild(info);
+    return row;
+  }
 
-    var media = coverNode(p, "media");
-    media.onclick = function () { openPost(p.id); };
-    if (p.archived) media.appendChild(el("div", "flag", "Archived"));
-    /* double-tap the media to like, the gesture people already know */
+  /* One Short in the vertical player. */
+  function shortNode(p) {
+    var box = el("div", "short");
+    var m = coverNode(p, "media");
+    m.onclick = function () { openPost(p.id); };
+    box.appendChild(m);
+
     var burst = el("div", "burst");
     burst.appendChild(heart(true));
-    media.appendChild(burst);
-    media.addEventListener("dblclick", function (e) {
+    box.appendChild(burst);
+    box.addEventListener("dblclick", function (e) {
       e.preventDefault();
-      e.stopPropagation();
       if (!Store.iLiked(p.id)) Store.toggleLike(p.id);
       burst.classList.remove("on");
       void burst.offsetWidth;
       burst.classList.add("on");
     });
-    post.appendChild(media);
 
-    var acts = el("div", "post-actions");
-    var like = el("button", "ico");
-    like.setAttribute("aria-pressed", Store.iLiked(p.id) ? "true" : "false");
-    like.setAttribute("aria-label", Store.iLiked(p.id) ? "Unlike" : "Like");
-    like.appendChild(heart(Store.iLiked(p.id)));
-    var n = Store.likeCount(p.id);
-    like.appendChild(el("span", "mono", n + (n === 1 ? " like" : " likes")));
-    like.onclick = function () { Store.toggleLike(p.id); };
-    acts.appendChild(like);
-
-    var com = el("button", "ico");
-    com.setAttribute("aria-label", "Comments");
-    com.appendChild(bubble());
-    var cn = Store.commentCount(p.id);
-    com.appendChild(el("span", "mono", cn + (cn === 1 ? " comment" : " comments")));
-    com.onclick = function () { openPost(p.id, true); };
-    acts.appendChild(com);
-
-    acts.appendChild(el("span", "when", ago(p.createdAt)));
-    post.appendChild(acts);
-
-    var cap = el("div", "caption");
-    var line = el("div", "line");
-    var b = el("b", null, authorName(p));
-    line.appendChild(b);
-    line.appendChild(document.createTextNode(" " + (p.title || "Untitled")));
-    cap.appendChild(line);
-    if (p.note) cap.appendChild(el("div", "note", p.note));
-    if (p.tags && p.tags.length) {
-      var tg = el("div", "tags");
-      p.tags.slice(0, 4).forEach(function (t) {
-        var tb = el("button", "tag", "#" + t);
-        tb.onclick = function () { view.q = t; $("q").value = t; goTo("search"); };
-        tg.appendChild(tb);
-      });
-      cap.appendChild(tg);
+    var info = el("div", "short-info");
+    var who = el("div", "who");
+    who.appendChild(avatarNode(p, 26));
+    who.appendChild(document.createTextNode(authorName(p)));
+    if (p.authorId && p.authorId !== Store.uid()) {
+      var sub = el("button", "btn small" + (Store.iFollow(p.authorId) ? "" : " primary"),
+        Store.iFollow(p.authorId) ? "Subscribed" : "Subscribe");
+      sub.onclick = function (e) { e.stopPropagation(); Store.toggleFollow(p.authorId); };
+      who.appendChild(sub);
     }
-    post.appendChild(cap);
-    return post;
+    info.appendChild(who);
+    info.appendChild(el("div", "t", p.title || "Untitled"));
+    info.appendChild(el("div", "s", viewLine(p) + " · " + fmtDur(p.durationSec)));
+    box.appendChild(info);
+
+    var rail = el("div", "short-rail");
+    var like = el("button");
+    like.setAttribute("aria-pressed", Store.iLiked(p.id) ? "true" : "false");
+    like.appendChild(heart(Store.iLiked(p.id)));
+    like.appendChild(el("span", null, String(Store.likeCount(p.id))));
+    like.onclick = function (e) { e.stopPropagation(); Store.toggleLike(p.id); };
+    rail.appendChild(like);
+
+    var com = el("button");
+    com.appendChild(bubble());
+    com.appendChild(el("span", null, String(Store.commentCount(p.id))));
+    com.onclick = function (e) { e.stopPropagation(); openPost(p.id, true); };
+    rail.appendChild(com);
+
+    if (p.authorId === Store.uid()) {
+      var more = el("button");
+      more.appendChild(el("span", null, "⋯"));
+      more.style.fontSize = "22px";
+      more.onclick = function (e) { e.stopPropagation(); openOwnerMenu(p.id); };
+      rail.appendChild(more);
+    }
+    box.appendChild(rail);
+    return box;
   }
 
   /* A profile tile: square, media only — the You tab is a contact sheet. */
@@ -340,7 +364,7 @@
       row.appendChild(avatarNode(c.post, 28));
       row.appendChild(el("div", "nm", authorName(c.post)));
       var f = el("button", "btn small" + (Store.iFollow(c.id) ? "" : " primary"),
-        Store.iFollow(c.id) ? "Following" : "Follow");
+        Store.iFollow(c.id) ? "Subscribed" : "Subscribe");
       f.onclick = function () { Store.toggleFollow(c.id); };
       row.appendChild(f);
       box.appendChild(row);
@@ -406,8 +430,8 @@
         e.appendChild(el("h3", null, "Nothing uploaded yet"));
         e.appendChild(el("p", null, "Post a walkthrough, a cheat sheet or a 30-second trick."));
       } else if (view.tab === "following") {
-        e.appendChild(el("h3", null, "You follow no one yet"));
-        e.appendChild(el("p", null, "Follow a creator and their uploads land here."));
+        e.appendChild(el("h3", null, "No subscriptions yet"));
+        e.appendChild(el("p", null, "Subscribe to a creator and their uploads land here."));
         e.appendChild(suggestNode());
       } else if (view.tab === "search" && !view.q.trim()) {
         e.appendChild(el("h3", null, "Search Stackgram"));
@@ -423,15 +447,36 @@
       var tiles = el("div", "tiles");
       list.forEach(function (p) { tiles.appendChild(tileNode(p)); });
       out.appendChild(tiles);
-    } else {
-      var feed = el("div", "feed");
-      list.forEach(function (p) { feed.appendChild(postNode(p)); });
-      out.appendChild(feed);
+      return;
+    }
+    if (view.tab === "shorts") {
+      var shorts = el("div", "shorts");
+      list.forEach(function (p) { shorts.appendChild(shortNode(p)); });
+      out.appendChild(shorts);
+      return;
+    }
+    /* home, search and subscriptions: Shorts on a shelf, videos in rows */
+    var shortList = list.filter(isShort);
+    var videoList = list.filter(function (p) { return !isShort(p); });
+    if (shortList.length) {
+      var h = el("div", "section-h");
+      h.appendChild(el("span", "dot"));
+      h.appendChild(document.createTextNode("Shorts"));
+      out.appendChild(h);
+      var shelf = el("div", "shelf");
+      shortList.forEach(function (p) { shelf.appendChild(shelfItem(p)); });
+      out.appendChild(shelf);
+    }
+    if (videoList.length) {
+      if (shortList.length) out.appendChild(el("div", "section-h", "Videos"));
+      var rows = el("div", "rows");
+      videoList.forEach(function (p) { rows.appendChild(videoRow(p)); });
+      out.appendChild(rows);
     }
   }
 
   function render() {
-    ["feed", "search", "following", "you"].forEach(function (v) {
+    ["feed", "shorts", "search", "following", "you"].forEach(function (v) {
       $("t-" + v).setAttribute("aria-pressed", view.tab === v ? "true" : "false");
     });
     $("searchbar").hidden = view.tab !== "search";
@@ -600,6 +645,7 @@
   function openPost(pid, focusComment) {
     var p = Store.posts().filter(function (x) { return x.id === pid; })[0];
     if (!p) return;
+    Store.addView(p.id);
     var sheet = el("div", "sheet wide");
     var wrap = el("div", "post-view");
     wrap.appendChild(coverNode(p, true));
@@ -614,13 +660,13 @@
     var nm = el("div", null, authorName(p));
     nm.style.cssText = "font-weight:600;font-size:14px";
     meta.appendChild(nm);
-    var sub = el("div", null, Store.followerCount(p.authorId) + " followers · " + ago(p.createdAt));
+    var sub = el("div", null, Store.followerCount(p.authorId) + " subscribers · " + viewLine(p));
     sub.style.cssText = "font-size:12px;color:var(--muted)";
     meta.appendChild(sub);
     head.appendChild(meta);
     if (p.authorId && p.authorId !== Store.uid()) {
       var fb = el("button", "btn small" + (Store.iFollow(p.authorId) ? "" : " primary"),
-        Store.iFollow(p.authorId) ? "Following" : "Follow");
+        Store.iFollow(p.authorId) ? "Subscribed" : "Subscribe");
       fb.onclick = function () { Store.toggleFollow(p.authorId); openPost(pid); };
       head.appendChild(fb);
     }
@@ -915,6 +961,14 @@
 
 
   /* ---------------- events ---------------- */
+  function openShorts(pid) {
+    goTo("shorts");
+    var idx = visiblePosts().map(function (p) { return p.id; }).indexOf(pid);
+    if (idx < 0) return;
+    var node = $("main-out").querySelectorAll(".short")[idx];
+    if (node) node.scrollIntoView({ block: "center" });
+  }
+
   function goTo(tab) {
     view.tab = tab;
     if (tab !== "you") view.archived = false;
@@ -925,7 +979,7 @@
 
   $("t-upload").onclick = function () { openComposer(null); };
   $("q").addEventListener("input", function (e) { view.q = e.target.value; renderFeed(); });
-  ["feed", "search", "following", "you"].forEach(function (v) {
+  ["feed", "shorts", "search", "following", "you"].forEach(function (v) {
     $("t-" + v).onclick = function () { goTo(v); };
   });
   $("f-dur").onchange = function (e) { view.dur = e.target.value; render(); };
