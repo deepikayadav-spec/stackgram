@@ -76,10 +76,27 @@ window.StackgramStore = (function () {
   var SEED_LIKES = { s01: 4, s02: 2, s03: 5, s04: 2, s05: 3, s06: 6,
                      s07: 2, s08: 1, s09: 2, s10: 3, s11: 3, s12: 2 };
 
+  /* a couple of seeded threads, so the comment UI shows what it is for */
+  var SEED_COMMENTS = {
+    s01: [
+      { id: "c1", authorId: "demo-vikram", authorName: "Vikram S.", sample: true,
+        text: "Step 4 is exactly where I kept losing track. The pause helps.",
+        at: "2026-09-15T12:10:00.000Z" },
+      { id: "c2", authorId: "demo-priya", authorName: "Priya D.", sample: true,
+        text: "Can you do the same for the longest repeating character replacement?",
+        at: "2026-09-16T07:40:00.000Z" }
+    ],
+    s06: [
+      { id: "c3", authorId: "demo-meera", authorName: "Meera K.", sample: true,
+        text: "The retrieval scores being real numbers makes this so much clearer.",
+        at: "2026-09-16T09:05:00.000Z" }
+    ]
+  };
+
   var KEY = "stackgram.v1";
   var MAX_BYTES = 3 * 1024 * 1024; /* uploads become data URLs in localStorage */
 
-  var state = { me: null, name: "", posts: [], likes: [], follows: [] };
+  var state = { me: null, name: "", posts: [], likes: [], follows: [], comments: {} };
   var storageOk = true;
   var onChange = function () {};
 
@@ -94,7 +111,8 @@ window.StackgramStore = (function () {
         name: d.name || "",
         posts: Array.isArray(d.posts) ? d.posts : [],
         likes: Array.isArray(d.likes) ? d.likes : [],
-        follows: Array.isArray(d.follows) ? d.follows : []
+        follows: Array.isArray(d.follows) ? d.follows : [],
+        comments: (d.comments && typeof d.comments === "object") ? d.comments : {}
       };
     } catch (e) { /* private window or blocked storage: run in memory */ }
   }
@@ -149,6 +167,39 @@ window.StackgramStore = (function () {
       var i = state.follows.indexOf(id);
       if (i === -1) state.follows.push(id); else state.follows.splice(i, 1);
       changed();
+    },
+
+    comments: function (postId) {
+      var seeded = SEED_COMMENTS[postId] || [];
+      var mine = state.comments[postId] || [];
+      return seeded.concat(mine).sort(function (a, b) {
+        return String(a.at).localeCompare(String(b.at));
+      });
+    },
+    commentCount: function (postId) { return this.comments(postId).length; },
+    canComment: function () { return true; },
+    addComment: function (postId, text) {
+      if (!state.comments[postId]) state.comments[postId] = [];
+      var c = {
+        id: "c" + Date.now().toString(36) + hash(text + Math.random()).toString(36).slice(0, 4),
+        authorId: state.me,
+        text: text,
+        at: new Date().toISOString()
+      };
+      state.comments[postId].push(c);
+      if (!write()) {
+        state.comments[postId].pop();
+        onChange();
+        return Promise.reject(new Error("This browser wouldn't store that comment."));
+      }
+      onChange();
+      return Promise.resolve();
+    },
+    deleteComment: function (postId, commentId) {
+      var mine = state.comments[postId] || [];
+      state.comments[postId] = mine.filter(function (c) { return c.id !== commentId; });
+      changed();
+      return Promise.resolve();
     },
 
     canPost: function () { return true; },

@@ -72,6 +72,11 @@
     if (p.authorId && p.authorId === Store.uid()) return Store.name() || "You";
     return p.authorName || Store.nameFor(p.authorId) || "Someone";
   }
+  function commentAuthor(c) {
+    if (c.authorId && c.authorId === Store.uid()) return Store.name() || "You";
+    return c.authorName || Store.nameFor(c.authorId) || "Someone";
+  }
+
   function durBucket(sec) {
     if (sec < 60) return "s";
     if (sec < 300) return "m";
@@ -121,6 +126,19 @@
     s.appendChild(p);
     return s;
   }
+  function bubble() {
+    var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.setAttribute("fill", "none");
+    s.setAttribute("stroke", "currentColor");
+    s.setAttribute("stroke-width", "2");
+    s.setAttribute("stroke-linejoin", "round");
+    var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", "M21 12a8 8 0 0 1-8 8H4l2.2-3.1A8 8 0 1 1 21 12Z");
+    s.appendChild(p);
+    return s;
+  }
+
   function avatarNode(p, size) {
     var a = el("div", "av", initials(authorName(p)));
     a.style.background = avatarColor(p.authorId || "anon");
@@ -252,6 +270,15 @@
     like.appendChild(el("span", "mono", n + (n === 1 ? " like" : " likes")));
     like.onclick = function () { Store.toggleLike(p.id); };
     acts.appendChild(like);
+
+    var com = el("button", "ico");
+    com.setAttribute("aria-label", "Comments");
+    com.appendChild(bubble());
+    var cn = Store.commentCount(p.id);
+    com.appendChild(el("span", "mono", cn + (cn === 1 ? " comment" : " comments")));
+    com.onclick = function () { openPost(p.id, true); };
+    acts.appendChild(com);
+
     acts.appendChild(el("span", "when", ago(p.createdAt)));
     post.appendChild(acts);
 
@@ -419,9 +446,21 @@
   }
 
   /* ---------------- overlays ---------------- */
-  function closeLayer() {
+  /* An open sheet is a history entry, so the browser and phone back button
+     close it instead of leaving the app. */
+  var sheetOpen = false;
+
+  function dismissLayer() {
     $("layer").textContent = "";
+    sheetOpen = false;
     document.removeEventListener("keydown", escClose);
+  }
+  function closeLayer() {
+    if (sheetOpen && window.history.state && window.history.state.stackgramSheet) {
+      window.history.back();   /* popstate dismisses it */
+      return;
+    }
+    dismissLayer();
   }
   function escClose(e) { if (e.key === "Escape") closeLayer(); }
   function openLayer(sheet) {
@@ -431,14 +470,37 @@
     scrim.onclick = function (e) { if (e.target === scrim) closeLayer(); };
     scrim.appendChild(sheet);
     layer.appendChild(scrim);
+    if (!sheetOpen) {
+      try { window.history.pushState({ stackgramSheet: true }, ""); } catch (e) {}
+      sheetOpen = true;
+    }
     document.addEventListener("keydown", escClose);
   }
+  window.addEventListener("popstate", function () { if (sheetOpen) dismissLayer(); });
+
+  function backArrow() {
+    var b = el("button", "back");
+    b.type = "button";
+    b.setAttribute("aria-label", "Back");
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", "M15 5l-7 7 7 7");
+    svg.appendChild(p);
+    b.appendChild(svg);
+    b.onclick = closeLayer;
+    return b;
+  }
+
   function sheetHead(title) {
     var head = el("div", "sheet-h");
+    head.appendChild(backArrow());
     head.appendChild(el("h2", null, title));
-    var x = el("button", "btn small", "Close");
-    x.onclick = closeLayer;
-    head.appendChild(x);
     return head;
   }
 
@@ -474,11 +536,11 @@
     var list = el("div", "menu-list");
 
     var open = el("button", null, "Open");
-    open.onclick = function () { closeLayer(); openPost(pid); };
+    open.onclick = function () { openPost(pid); };
     list.appendChild(open);
 
     var edit = el("button", null, "Edit details");
-    edit.onclick = function () { closeLayer(); openComposer(p); };
+    edit.onclick = function () { openComposer(p); };
     list.appendChild(edit);
 
     var arch = el("button", null, p.archived
@@ -535,7 +597,7 @@
     openLayer(sheet);
   }
 
-  function openPost(pid) {
+  function openPost(pid, focusComment) {
     var p = Store.posts().filter(function (x) { return x.id === pid; })[0];
     if (!p) return;
     var sheet = el("div", "sheet wide");
@@ -558,7 +620,7 @@
     if (p.authorId && p.authorId !== Store.uid()) {
       var fb = el("button", "btn small" + (Store.iFollow(p.authorId) ? "" : " primary"),
         Store.iFollow(p.authorId) ? "Following" : "Follow");
-      fb.onclick = function () { Store.toggleFollow(p.authorId); closeLayer(); openPost(pid); };
+      fb.onclick = function () { Store.toggleFollow(p.authorId); openPost(pid); };
       head.appendChild(fb);
     }
     var x = el("button", "btn small", "Close");
@@ -593,6 +655,55 @@
     /* download-link:end */
     if (p.sample) side.appendChild(el("div", "hint", "Sample post, seeded to show the feed in use."));
 
+    /* comments live under the caption, where people look for them */
+    var cbox = el("div", "comments");
+    var list = Store.comments(p.id);
+    if (!list.length) cbox.appendChild(el("p", "hint", "No comments yet."));
+    list.forEach(function (c) {
+      var row = el("div", "comment");
+      var who = { authorId: c.authorId, authorName: c.authorName };
+      row.appendChild(avatarNode(who, 26));
+      var body = el("div", "body");
+      var line = el("div", "line");
+      line.appendChild(el("b", null, commentAuthor(c)));
+      line.appendChild(document.createTextNode(" " + c.text));
+      body.appendChild(line);
+      body.appendChild(el("div", "when", ago(c.at)));
+      row.appendChild(body);
+      if (c.authorId === Store.uid() || p.authorId === Store.uid()) {
+        var d = el("button", "del", "Delete");
+        d.onclick = function () {
+          Store.deleteComment(p.id, c.id).then(function () { openPost(pid, false); },
+            function () { toast("Couldn't delete that comment"); });
+        };
+        row.appendChild(d);
+      }
+      cbox.appendChild(row);
+    });
+    if (Store.canComment()) {
+      var form = el("div", "comment-form");
+      var inp = document.createElement("input");
+      inp.id = "comment-input";
+      inp.maxLength = 300;
+      inp.placeholder = "Add a comment…";
+      var send = el("button", null, "Post");
+      send.disabled = true;
+      inp.addEventListener("input", function () { send.disabled = !inp.value.trim(); });
+      var submit = function () {
+        var text = inp.value.trim();
+        if (!text) return;
+        send.disabled = true;
+        Store.addComment(p.id, text).then(function () { openPost(pid, true); },
+          function (e) { send.disabled = false; toast((e && e.message) || "Couldn't post that comment"); });
+      };
+      send.onclick = submit;
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      form.appendChild(inp);
+      form.appendChild(send);
+      cbox.appendChild(form);
+    }
+    side.appendChild(cbox);
+
     var acts = el("div");
     acts.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)";
     var like = el("button", "ico");
@@ -600,13 +711,13 @@
     like.appendChild(heart(Store.iLiked(p.id)));
     var n = Store.likeCount(p.id);
     like.appendChild(el("span", "mono", n + (n === 1 ? " like" : " likes")));
-    like.onclick = function () { Store.toggleLike(p.id); closeLayer(); openPost(pid); };
+    like.onclick = function () { Store.toggleLike(p.id); openPost(pid); };
     acts.appendChild(like);
     if (p.authorId === Store.uid()) {
       var own = el("div");
       own.style.cssText = "margin-left:auto;display:flex;gap:8px";
       var edit = el("button", "btn small", "Edit");
-      edit.onclick = function () { closeLayer(); openComposer(p); };
+      edit.onclick = function () { openComposer(p); };
       own.appendChild(edit);
       var arch = el("button", "btn small", p.archived ? "Unarchive" : "Archive");
       arch.onclick = function () { setArchived(p, !p.archived); };
@@ -620,6 +731,10 @@
     wrap.appendChild(side);
     sheet.appendChild(wrap);
     openLayer(sheet);
+    if (focusComment) {
+      var box = $("comment-input");
+      if (box) { box.focus(); box.scrollIntoView({ block: "center" }); }
+    }
   }
 
   /* One sheet for both jobs: `existing` means edit that post, otherwise post

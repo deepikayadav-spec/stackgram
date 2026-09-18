@@ -9,7 +9,7 @@ window.StackgramStore = (function () {
 
   var db = null, assets = null, user = null;
   var uid = null, myName = "", canWrite = null, ready = false;
-  var posts = [], likes = [], follows = [], names = {};
+  var posts = [], likes = [], follows = [], comments = [], names = {};
   var onChange = function () {};
   var mediaCache = {};
   var pendingNames = false;
@@ -28,9 +28,10 @@ window.StackgramStore = (function () {
   function resolveNames() {
     if (!user || !user.profiles || pendingNames) return;
     var ids = [];
-    posts.forEach(function (p) {
-      if (p.authorId && !p.authorName && p.authorId !== uid && !(p.authorId in names)) {
-        if (ids.indexOf(p.authorId) === -1) ids.push(p.authorId);
+    posts.concat(comments).forEach(function (p) {
+      var who = p.authorId;
+      if (who && !p.authorName && who !== uid && !(who in names)) {
+        if (ids.indexOf(who) === -1) ids.push(who);
       }
     });
     if (!ids.length) return;
@@ -63,6 +64,16 @@ window.StackgramStore = (function () {
     db.collection("follows").onSnapshot(function (snap) {
       follows = snap.docs.map(function (d) { return d.data() || {}; });
       onChange();
+    }, function () {});
+
+    db.collection("comments").onSnapshot(function (snap) {
+      comments = snap.docs.map(function (d) {
+        var o = Object.assign({}, d.data() || {});
+        o.id = d.id;
+        return o;
+      });
+      onChange();
+      resolveNames();
     }, function () {});
   }
 
@@ -149,6 +160,30 @@ window.StackgramStore = (function () {
       var ref = db.collection("follows").doc(safeId(uid) + "__" + safeId(id));
       if (this.iFollow(id)) ref.delete().catch(function () {});
       else ref.set({ followerId: uid, targetId: id, at: new Date().toISOString() }).catch(function () {});
+    },
+
+    comments: function (postId) {
+      return comments.filter(function (c) { return c.postId === postId; })
+        .sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+    },
+    commentCount: function (postId) {
+      var n = 0, i;
+      for (i = 0; i < comments.length; i++) if (comments[i].postId === postId) n++;
+      return n;
+    },
+    canComment: function () { return !!(db && uid && canWrite !== false); },
+    addComment: function (postId, text) {
+      if (!this.canComment()) return Promise.reject(new Error("You have read-only access here"));
+      var id = "c" + Date.now().toString(36) + hash(text + Math.random()).toString(36).slice(0, 4);
+      return db.collection("comments").doc(id).set({
+        postId: postId, authorId: uid, text: text, at: new Date().toISOString()
+      }).then(function () {}, function () {
+        throw new Error("Couldn't post that comment.");
+      });
+    },
+    deleteComment: function (postId, commentId) {
+      if (!db) return Promise.reject(new Error("not connected"));
+      return db.collection("comments").doc(commentId).delete();
     },
 
     canPost: function () { return !!(db && uid && canWrite !== false); },
