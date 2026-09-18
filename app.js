@@ -154,8 +154,18 @@
     box.appendChild(el("div", "ghost", p.title || ""));
     if (msg) {
       var n = el("div", null, msg);
-      n.style.cssText = "position:absolute;left:12px;right:12px;top:12px;font-size:11px;color:rgba(255,255,255,.9)";
+      n.style.cssText = "position:absolute;left:12px;right:12px;top:12px;font-size:11.5px;color:rgba(255,255,255,.92);line-height:1.4";
       box.appendChild(n);
+      /* give people a way to watch it anyway, where the page may open files */
+      if (Store.allowDownloads() && Store.mediaSrc(p)) {
+        var link = el("a", null, "Open the video file ↗");
+        link.href = Store.mediaSrc(p);
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.style.cssText = "position:absolute;left:12px;top:62px;font-size:12px;font-weight:600;color:#fff;text-decoration:underline";
+        link.onclick = function (e) { e.stopPropagation(); };
+        box.appendChild(link);
+      }
     }
   }
   function coverNode(p, mode) {
@@ -195,7 +205,7 @@
       setTimeout(function () {
         if (vid.readyState === 0 && box.contains(vid)) {
           vid.remove();
-          plainCover(box, p, "Video can't play in this view");
+          plainCover(box, p, "This browser would not start the video.");
         }
       }, 6000);
       if (big) {
