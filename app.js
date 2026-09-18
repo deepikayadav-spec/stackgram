@@ -480,6 +480,7 @@
       $("t-" + v).setAttribute("aria-pressed", view.tab === v ? "true" : "false");
     });
     $("searchbar").hidden = view.tab !== "search";
+    $("scroller").classList.toggle("snap", view.tab === "shorts");
     $("f-dur").value = view.dur;
     $("f-sort").value = view.sort;
     var note = Store.notice();
