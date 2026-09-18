@@ -68,7 +68,25 @@ window.StackgramStore = (function () {
       title: "Probability: the 3 questions that decide the marks",
       note: "Conditional, Bayes, expectation. One worked problem each, timed.",
       track: "math", durationSec: 1562, kind: "clip", src: "media/prev_probability.gif",
-      createdAt: "2026-09-07T18:20:00.000Z", tags: ["probability", "bayes"] }
+      createdAt: "2026-09-07T18:20:00.000Z", tags: ["probability", "bayes"] },
+    { id: "s13", authorId: "demo-ananya", authorName: "Ananya R.", sample: true,
+      title: "Big-O, in plain terms — spoken",
+      note: "A 42-second walkthrough with narration: constant, linear and quadratic growth drawn as the input grows. Narrated with a synthetic voice and a drawn presenter, not a recording of a person.",
+      track: "dsa", durationSec: 42, kind: "video", src: "media/talk_bigo.mp4",
+      preview: "media/talk_bigo.gif",
+      createdAt: "2026-09-17T15:10:00.000Z", tags: ["complexity", "big-o", "interview"] },
+    { id: "s14", authorId: "demo-karthik", authorName: "Karthik N.", sample: true,
+      title: "One attention head, explained out loud",
+      note: "Queries, keys and values on a six-word sentence, the softmax over scores, why several heads, why the mask, and where the quadratic cost comes from. Narrated with a synthetic voice and a drawn presenter.",
+      track: "gen", durationSec: 100, kind: "video", src: "media/talk_attention.mp4",
+      preview: "media/talk_attention.gif",
+      createdAt: "2026-09-17T16:20:00.000Z", tags: ["transformers", "attention", "llm"] },
+    { id: "s15", authorId: "demo-vikram", authorName: "Vikram S.", sample: true,
+      title: "Percentages without a calculator",
+      note: "Tenths and halves of tenths, reverse percentages, and why a 10% rise followed by a 10% fall leaves you 1% down. Narrated with a synthetic voice and a drawn presenter.",
+      track: "apt", durationSec: 88, kind: "video", src: "media/talk_percent.mp4",
+      preview: "media/talk_percent.gif",
+      createdAt: "2026-09-17T17:05:00.000Z", tags: ["percentages", "mental-maths", "speed"] }
   ];
 
   /* like counts the seeded posts arrive with, so the feed reads as a feed in
@@ -94,7 +112,7 @@ window.StackgramStore = (function () {
   };
 
   var SEED_VIEWS = { s01: 412, s02: 288, s03: 1530, s04: 640, s05: 502, s06: 1184,
-                     s07: 733, s08: 214, s09: 96, s10: 388, s11: 910, s12: 655 };
+                     s07: 733, s08: 214, s09: 96, s10: 388, s11: 910, s12: 655, s13: 1260, s14: 2140, s15: 1475 };
 
   var KEY = "stackgram.v1";
   var MAX_BYTES = 3 * 1024 * 1024; /* uploads become data URLs in localStorage */
@@ -149,6 +167,8 @@ window.StackgramStore = (function () {
 
     posts: function () { return SEED_POSTS.concat(state.posts); },
     mediaSrc: function (p) { return p.src || ""; },
+    /* a light looping preview for thumbnails, when a post has one */
+    previewSrc: function (p) { return p.preview || ""; },
 
     likeCount: function (pid) {
       return (SEED_LIKES[pid] || 0) + (state.likes.indexOf(pid) === -1 ? 0 : 1);

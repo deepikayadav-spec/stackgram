@@ -170,7 +170,14 @@
       box.setAttribute("aria-label", "Open " + (p.title || "post"));
     }
     var src = Store.mediaSrc(p);
-    if (src && (p.kind === "image" || p.kind === "clip")) {
+    var preview = Store.previewSrc(p);
+    if (!big && preview) {
+      var pv = document.createElement("img");
+      pv.src = preview;
+      pv.alt = p.title || "Preview";
+      pv.addEventListener("error", function () { pv.remove(); plainCover(box, p); });
+      box.appendChild(pv);
+    } else if (src && (p.kind === "image" || p.kind === "clip")) {
       var img = document.createElement("img");
       img.src = src;
       img.alt = p.title || "Post media";

@@ -137,6 +137,10 @@ window.StackgramStore = (function () {
       return mediaCache[p.assetId];
     },
 
+    previewSrc: function (p) {
+      return p.previewAssetId ? "/_blob/" + p.previewAssetId : "";
+    },
+
     likeCount: function (pid) {
       var n = 0, i;
       for (i = 0; i < likes.length; i++) if (likes[i].postId === pid) n++;
