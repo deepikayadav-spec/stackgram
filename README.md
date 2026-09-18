@@ -35,6 +35,18 @@ the app reads and writes through it and does not change.
 fraction flash table), rendered with ffmpeg. They are not recordings of people. The
 matching `media/*.mp4` originals are linked from each post as a download.
 
+## Build
+
+`index.html` and the artifact are generated — edit the shared sources, never
+the outputs:
+
+```
+body.html  app.css  app.js      shared markup, styles, UI
+store-local.js                  this site: state in the visitor's browser
+store-cloud.js                  claude.ai artifact: shared database
+python build.py                 -> index.html and ../stackgram.html
+```
+
 ## Run locally
 
 Any static server, e.g.:
