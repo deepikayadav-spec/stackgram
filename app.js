@@ -591,7 +591,7 @@
   $("t-upload").onclick = openUpload;
   $("q").addEventListener("input", function (e) { view.q = e.target.value; renderFeed(); });
   ["feed", "following", "you"].forEach(function (v) {
-    var go = function () { view.tab = v; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    var go = function () { view.tab = v; render(); $("scroller").scrollTo({ top: 0, behavior: "smooth" }); };
     $("v-" + v).onclick = go;
     $("t-" + v).onclick = go;
   });
