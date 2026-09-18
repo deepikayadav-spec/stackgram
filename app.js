@@ -85,6 +85,7 @@
       if (view.track !== "all" && p.track !== view.track) return false;
       if (view.dur !== "all" && durBucket(p.durationSec || 0) !== view.dur) return false;
       if (view.tab === "following" && !Store.iFollow(p.authorId)) return false;
+      /* the search tab searches everything, so it filters like the feed */
       if (view.tab === "you" && p.authorId !== Store.uid()) return false;
       /* an archived post is visible only to its creator, on the You tab with
          the archive open */
@@ -265,7 +266,7 @@
       var tg = el("div", "tags");
       p.tags.slice(0, 4).forEach(function (t) {
         var tb = el("button", "tag", "#" + t);
-        tb.onclick = function () { view.q = t; $("q").value = t; render(); };
+        tb.onclick = function () { view.q = t; $("q").value = t; goTo("search"); };
         tg.appendChild(tb);
       });
       cap.appendChild(tg);
@@ -381,6 +382,9 @@
         e.appendChild(el("h3", null, "You follow no one yet"));
         e.appendChild(el("p", null, "Follow a creator and their uploads land here."));
         e.appendChild(suggestNode());
+      } else if (view.tab === "search" && !view.q.trim()) {
+        e.appendChild(el("h3", null, "Search Stackgram"));
+        e.appendChild(el("p", null, "Type a topic, a creator or a tag — or pick a track above."));
       } else {
         e.appendChild(el("h3", null, "No posts match"));
         e.appendChild(el("p", null, "Clear the search or pick another track."));
@@ -400,10 +404,10 @@
   }
 
   function render() {
-    ["feed", "following", "you"].forEach(function (v) {
-      $("v-" + v).setAttribute("aria-pressed", view.tab === v ? "true" : "false");
+    ["feed", "search", "following", "you"].forEach(function (v) {
       $("t-" + v).setAttribute("aria-pressed", view.tab === v ? "true" : "false");
     });
+    $("searchbar").hidden = view.tab !== "search";
     $("f-dur").value = view.dur;
     $("f-sort").value = view.sort;
     var note = Store.notice();
@@ -572,7 +576,7 @@
       var tg = el("div", "tags");
       p.tags.forEach(function (t) {
         var b = el("button", "tag", "#" + t);
-        b.onclick = function () { view.q = t; $("q").value = t; closeLayer(); render(); };
+        b.onclick = function () { view.q = t; $("q").value = t; closeLayer(); goTo("search"); };
         tg.appendChild(b);
       });
       side.appendChild(tg);
@@ -798,13 +802,18 @@
 
 
   /* ---------------- events ---------------- */
-  $("new-post").onclick = function () { openComposer(null); };
+  function goTo(tab) {
+    view.tab = tab;
+    if (tab !== "you") view.archived = false;
+    render();
+    $("scroller").scrollTo({ top: 0, behavior: "smooth" });
+    if (tab === "search") $("q").focus();
+  }
+
   $("t-upload").onclick = function () { openComposer(null); };
   $("q").addEventListener("input", function (e) { view.q = e.target.value; renderFeed(); });
-  ["feed", "following", "you"].forEach(function (v) {
-    var go = function () { view.tab = v; if (v !== "you") view.archived = false; render(); $("scroller").scrollTo({ top: 0, behavior: "smooth" }); };
-    $("v-" + v).onclick = go;
-    $("t-" + v).onclick = go;
+  ["feed", "search", "following", "you"].forEach(function (v) {
+    $("t-" + v).onclick = function () { goTo(v); };
   });
   $("f-dur").onchange = function (e) { view.dur = e.target.value; render(); };
   $("f-sort").onchange = function (e) { view.sort = e.target.value; render(); };

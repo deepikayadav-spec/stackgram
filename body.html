@@ -1,20 +1,14 @@
 <div class="bar">
   <div class="bar-in">
     <div class="brand"><i></i>Stackgram</div>
-    <div class="search">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-      <input id="q" type="search" placeholder="Search posts, creators, tags…" autocomplete="off">
-    </div>
-    <button class="btn primary" id="new-post">Upload</button>
   </div>
 </div>
 
 <div class="scroller" id="scroller">
   <div class="wrap">
-  <div class="tabs" role="group" aria-label="Sections">
-    <button id="v-feed" aria-pressed="true">Feed</button>
-    <button id="v-following" aria-pressed="false">Following</button>
-    <button id="v-you" aria-pressed="false">You</button>
+  <div class="searchbar" id="searchbar" hidden>
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    <input id="q" type="search" placeholder="Search posts, creators, tags…" autocomplete="off">
   </div>
 
   <div id="banner"></div>
@@ -44,6 +38,10 @@
   <button id="t-feed" aria-pressed="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="9" rx="2"></rect><rect x="14" y="3" width="7" height="5" rx="2"></rect><rect x="3" y="16" width="7" height="5" rx="2"></rect><rect x="14" y="12" width="7" height="9" rx="2"></rect></svg>
     Feed
+  </button>
+  <button id="t-search" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    Search
   </button>
   <button id="t-following" aria-pressed="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8" r="3.4"></circle><path d="M3 20c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"></path><path d="M18 8.5v5M20.5 11h-5"></path></svg>
