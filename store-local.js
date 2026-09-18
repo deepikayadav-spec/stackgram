@@ -156,6 +156,7 @@ window.StackgramStore = (function () {
     canAttach: function () { return true; },
     attachHint: function () { return "Files are kept in this browser, so the limit is 3 MB."; },
     maxBytes: function () { return MAX_BYTES; },
+    allowDownloads: function () { return true; },
 
     addPost: function (doc, file) {
       var step = file

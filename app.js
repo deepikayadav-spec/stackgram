@@ -403,13 +403,16 @@
       });
       side.appendChild(tg);
     }
-    if (p.download) {
+    /* download-link:start (stripped from the artifact build: its viewer
+       never grants a page download permission, so the link would be dead) */
+    if (p.download && Store.allowDownloads()) {
       var dl = el("a", "hint", "Download the original MP4");
       dl.href = p.download;
       dl.download = "";
       dl.style.cssText = "color:var(--accent);font-weight:600;text-decoration:none";
       side.appendChild(dl);
     }
+    /* download-link:end */
     if (p.sample) side.appendChild(el("div", "hint", "Sample post, seeded to show the feed in use."));
 
     var acts = el("div");

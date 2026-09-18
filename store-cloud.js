@@ -163,7 +163,9 @@ window.StackgramStore = (function () {
         ? "Any length, up to 20 MB per file."
         : "File upload needs edit access on this artifact. You can still post notes.";
     },
+    /* the artifact viewer never grants a page download permission */
     maxBytes: function () { return MAX_BYTES; },
+    allowDownloads: function () { return false; },
 
     addPost: function (doc, file) {
       if (!this.canPost()) return Promise.reject(new Error(this.postBlockedReason()));
